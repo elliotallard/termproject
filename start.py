@@ -10,20 +10,23 @@ BARHEIGHT = 10
 STAFFSPACE = 50
 
 
-#keeps all compose variables
-class Compose(object):
-    def __init__(self, data):
-        self.notes = []   
-        self.topStaff = data.height//20 * 2
-        self.bottomStaff = data.height//20 * 19
-        self.leftStaff = data.width//20
-        self.rightStaff = data.width//20 * 19  
-        self.bars = []    #keeps locations of lines when drawing bars, can ref back to notes
+#keeps all compose variables  
 
-def init(data):
-    # There is only one init, not one-per-mode
+def init(data, compose):
+    # DATA
     data.mode = "compose"
     data.score = 0
+    #COMPOSE
+    compose.notes = []   
+    compose.topStaff = data.height//20 * 2
+    compose.bottomStaff = data.height//20 * 19       
+    compose.leftStaff = data.width//20
+    compose.rightStaff = data.width//20 * 19  
+    compose.bars = []    #keeps locations of lines when drawing bars, can ref back to notes 
+    compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
+    compose.noteXLimit = compose.rightStaff - 20  
+    compose.noteSpace = 20
+    compose.noteCurrStaff = 0
 
 ####################################
 # mode dispatcher
@@ -53,7 +56,9 @@ def redrawAll(canvas, data,compose):
 # compose mode
 ####################################
 
-def addNote(num, y, compose):
+def addNote(n, compose, start):
+    # print (n)
+    num = n - start
     if num == 0: note = "F0"
     if num == 5: note = "E0"
     if num == 10: note = "D0"
@@ -65,19 +70,20 @@ def addNote(num, y, compose):
     if num == 40: note = "E1"
     if num == 45: note = "D1"
     if num == 50: note = "C1"
-    compose.notes.append((note))
+    compose.notes.append((note, "1/4", n))
+    # print (compose.notes)
+
+import time
 
 def composeMousePressed(event, data,compose):
-    compose = Compose(data)
-    x = event.x
-    y = event.y
     for staff in compose.bars:
         start = staff[0] #getting first and last values of each bar
         end = staff[-1]
-        for step in range(0, end - start + 5, 5): #going through the staff, bar by bar
-            if num - 2 < y < num + 2:
-                addNote(x, y)
-    print (compose.notes)
+        # print (staff)
+        for step in range(start, end + 5, 5): #going through the staff, bar by bar
+            if step - 2 < event.y < step + 2:
+                addNote(step, compose, start)
+                return
 
 
 def composeKeyPressed(event, data,compose):
@@ -87,10 +93,28 @@ def composeTimerFired(data,compose):
     pass
 
 def composeRedrawAll(canvas, data,compose):
-    compose = Compose(data)
     x0,y0 = compose.leftStaff, compose.topStaff
     x1,y1 = compose.rightStaff, compose.bottomStaff
     drawStaff(canvas, compose, data)
+    drawNotes(canvas, compose, data)
+
+def drawQuarterNote(canvas, x,y):
+    radius = 5 #arbitrary for now
+    canvas.create_oval(x-radius,y-radius, x+radius,y+radius, fill = "black")
+
+def drawNotes(canvas, compose, data):
+    for note in compose.notes:
+        x = compose.noteXPlace
+        if x > compose.noteXLimit:
+            x = compose.rightStaff //20 + compose.leftStaff
+            compose.notexPlace = x
+            print (compose.notexPlace)
+            compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
+        y = note[2]
+        if note[1] == '1/4':
+            drawQuarterNote(canvas,x,y)
+        compose.noteXPlace += compose.noteSpace
+        # print (compose.noteXPlace)
 
 def drawStaff(canvas, compose, data):
     x0,y0 = compose.leftStaff, compose.topStaff
@@ -166,6 +190,8 @@ def playRedrawAll(canvas, data):
 # use the run function as-is
 ####################################
 
+
+
 def run(width=300, height=300):
     def redrawAllWrapper(canvas, data, compose):
         canvas.delete(ALL)
@@ -186,24 +212,25 @@ def run(width=300, height=300):
         timerFired(data,compose)
         redrawAllWrapper(canvas, data, compose)
         # pause, then call timerFired again
-        canvas.after(data.timerDelay, timerFiredWrapper, canvas, data)
+        canvas.after(data.timerDelay, timerFiredWrapper, canvas, data, compose)
     # Set up data and call init
     class Struct(object): pass
+    class Compose(object): pass
     data = Struct()
+    compose = Compose()
     data.width = width
     data.height = height
     data.timerDelay = 100 # milliseconds
-    compose = Compose(data)
-    init(data)
+    init(data, compose)
     # create the root and the canvas
     root = Tk()
     canvas = Canvas(root, width=data.width, height=data.height)
     canvas.pack()
     # set up events
     root.bind("<Button-1>", lambda event:
-                            mousePressedWrapper(event, canvas, data))
+                            mousePressedWrapper(event, canvas, data, compose))
     root.bind("<Key>", lambda event:
-                            keyPressedWrapper(event, canvas, data))
+                            keyPressedWrapper(event, canvas, data, compose))
     timerFiredWrapper(canvas, data, compose)
     # and launch the app
     root.mainloop()  # blocks until window is closed
