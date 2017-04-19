@@ -71,6 +71,7 @@ def addNote(n, compose, start):
     if num == 45: note = "D1"
     if num == 50: note = "C1"
     compose.notes.append((note, "1/4", n))
+    return
     # print (compose.notes)
 
 import time
@@ -115,6 +116,7 @@ def drawNotes(canvas, compose, data):
             drawQuarterNote(canvas,x,y)
         compose.noteXPlace += compose.noteSpace
         # print (compose.noteXPlace)
+    compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
 
 def drawStaff(canvas, compose, data):
     x0,y0 = compose.leftStaff, compose.topStaff
