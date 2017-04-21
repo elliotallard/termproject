@@ -12,14 +12,16 @@ STAFFSPACE = 50
 
 #keeps all compose variables  
 
-def init(data, compose):
+def init(data, compose, play):
     # DATA
     data.mode = "compose"
     data.score = 0
+    data.tempo = 60
+    data.tempoCoords = (400, 35/2)
     #COMPOSE
     compose.notes = []   
     compose.topStaff = data.height//20 * 2
-    compose.bottomStaff = data.height//20 * 19       
+    compose.bottomStaff = data.height//2       
     compose.leftStaff = data.width//20
     compose.rightStaff = data.width//20 * 19  
     compose.bars = []    #keeps locations of lines when drawing bars, can ref back to notes 
@@ -27,29 +29,39 @@ def init(data, compose):
     compose.noteXLimit = compose.rightStaff - 20  
     compose.noteSpace = 20
     compose.noteCurrStaff = 0
+    compose.playButtonCoords = (5,5,100,40)
+    compose.playButtonCenter = ((95)/2, 35/2)
+    compose.hearButtonCoords = (data.width - 105, 5, data.width - 5, 40)
+    compose.hearButtonCenter = (745, 35/2)
+    #HEAR
+    play.rightStaff, play.leftStaff = compose.rightStaff, compose.leftStaff
+    play.topStaff = data.height // 5
+    play.bottomStaff = data.height // 5 + 75
+
+
 
 ####################################
 # mode dispatcher
 ####################################
 
-def mousePressed(event, data, compose):
+def mousePressed(event, data, compose, play):
     if (data.mode == "compose"): composeMousePressed(event, data, compose)
-    elif (data.mode == "play"):   playMousePressed(event, data,)
+    elif (data.mode == "play"):   playMousePressed(event, data, play)
     elif (data.mode == "hear"):       hearMousePressed(event, data)
 
-def keyPressed(event, data, compose):
+def keyPressed(event, data, compose, play):
     if (data.mode == "compose"): composeKeyPressed(event, data,compose)
-    elif (data.mode == "play"):   playKeyPressed(event, data)
+    elif (data.mode == "play"):   playKeyPressed(event, data, play)
     elif (data.mode == "hear"):       hearKeyPressed(event, data)
 
-def timerFired(data, compose):
+def timerFired(data, compose, play):
     if (data.mode == "compose"): composeTimerFired(data,compose)
-    elif (data.mode == "play"):   playTimerFired(data)
+    elif (data.mode == "play"):   playTimerFired(data, play)
     elif (data.mode == "hear"):       hearTimerFired(data)
 
-def redrawAll(canvas, data,compose):
+def redrawAll(canvas, data,compose, play):
     if (data.mode == "compose"): composeRedrawAll(canvas, data,compose)
-    elif (data.mode == "play"):   playRedrawAll(canvas, data)
+    elif (data.mode == "play"):   playRedrawAll(canvas, data,compose, play)
     elif (data.mode == "hear"):       hearRedrawAll(canvas, data)
 
 ####################################
@@ -71,12 +83,17 @@ def addNote(n, compose, start):
     if num == 45: note = "D1"
     if num == 50: note = "C1"
     compose.notes.append((note, "1/4", n))
+    print (compose.notes)
     return
-    # print (compose.notes)
 
-import time
 
 def composeMousePressed(event, data,compose):
+    if (compose.playButtonCoords[0] < event.x < compose.playButtonCoords[2] and
+        compose.playButtonCoords[1] < event.y < compose.playButtonCoords[3]):
+        data.mode = "play"
+    if (compose.hearButtonCoords[0] < event.x < compose.hearButtonCoords[2] and
+        compose.hearButtonCoords[1] < event.y < compose.hearButtonCoords[3]):
+        data.mode = "hear"
     for staff in compose.bars:
         start = staff[0] #getting first and last values of each bar
         end = staff[-1]
@@ -88,7 +105,10 @@ def composeMousePressed(event, data,compose):
 
 
 def composeKeyPressed(event, data,compose):
-    pass
+    if event.keysym == "Up": 
+        if data.tempo < 225: data.tempo += 1
+    if event.keysym == "Down":
+        if data.tempo > 0: data.tempo -= 1 
 
 def composeTimerFired(data,compose):
     pass
@@ -98,6 +118,23 @@ def composeRedrawAll(canvas, data,compose):
     x1,y1 = compose.rightStaff, compose.bottomStaff
     drawStaff(canvas, compose, data)
     drawNotes(canvas, compose, data)
+    drawPlayButton(canvas, compose, data)
+    drawHearButton(canvas, compose, data)
+    drawTempoMsg(canvas, compose, data)
+
+def drawTempoMsg(canvas, compose, data):
+    tempoMsg = "Press up and down arrows to change tempo. Tempo = %d" % (data.tempo)
+    canvas.create_text(data.tempoCoords, text = tempoMsg)
+
+def drawPlayButton(canvas, compose, data):
+    play = "Play!"
+    canvas.create_rectangle(compose.playButtonCoords, fill = "red")
+    canvas.create_text(compose.playButtonCenter, text = play)
+
+def drawHearButton(canvas, compose, data):
+    play = "Hear It!"
+    canvas.create_rectangle(compose.hearButtonCoords, fill = "red")
+    canvas.create_text(compose.hearButtonCenter, text = play)
 
 def drawQuarterNote(canvas, x,y):
     radius = 5 #arbitrary for now
@@ -149,7 +186,7 @@ def hearMousePressed(event, data):
     pass
 
 def hearKeyPressed(event, data):
-    data.mode = "play"
+    pass
 
 def hearTimerFired(data):
     pass
@@ -168,25 +205,23 @@ def hearRedrawAll(canvas, data):
 # play mode
 ####################################
 
-def playMousePressed(event, data):
+def playMousePressed(event, data, play):
     data.score = 0
 
-def playKeyPressed(event, data):
-    if (event.keysym == 'h'):
-        data.mode = "hear"
+def playKeyPressed(event, data,play):
+    if event.keysym == "Up": 
+        if data.tempo < 225: data.tempo += 1
+    if event.keysym == "Down":
+        if data.tempo > 0: data.tempo -= 1 
 
-def playTimerFired(data):
+def playTimerFired(data,play):
     data.score += 1
 
-def playRedrawAll(canvas, data):
-    canvas.create_text(data.width/2, data.height/2-40,
-                       text="This is a fun game!", font="Arial 26 bold")
-    canvas.create_text(data.width/2, data.height/2-10,
-                       text="Score = " + str(data.score), font="Arial 20")
-    canvas.create_text(data.width/2, data.height/2+15,
-                       text="Click anywhere to reset score", font="Arial 20")
-    canvas.create_text(data.width/2, data.height/2+40,
-                       text="Press 'h' for hear!", font="Arial 20")
+def playRedrawAll(canvas, data, compose, play):
+    drawStaff(canvas, compose, data)
+    drawTempoMsg(canvas, compose, data)
+    drawNotes(canvas, compose, data)
+    
 
 ####################################
 # use the run function as-is
@@ -195,45 +230,47 @@ def playRedrawAll(canvas, data):
 
 
 def run(width=300, height=300):
-    def redrawAllWrapper(canvas, data, compose):
+    def redrawAllWrapper(canvas, data, compose,play):
         canvas.delete(ALL)
         canvas.create_rectangle(0, 0, data.width, data.height,
                                 fill='white', width=0)
-        redrawAll(canvas, data,compose)
+        redrawAll(canvas, data,compose,play)
         canvas.update()    
 
-    def mousePressedWrapper(event, canvas, data, compose):
-        mousePressed(event, data,compose)
-        redrawAllWrapper(canvas, data,compose)
+    def mousePressedWrapper(event, canvas, data, compose,play):
+        mousePressed(event, data,compose,play)
+        redrawAllWrapper(canvas, data,compose,play)
 
-    def keyPressedWrapper(event, canvas, data, compose):
-        keyPressed(event, data,compose)
-        redrawAllWrapper(canvas, data,compose)
+    def keyPressedWrapper(event, canvas, data, compose,play):
+        keyPressed(event, data,compose,play)
+        redrawAllWrapper(canvas, data,compose,play)
 
-    def timerFiredWrapper(canvas, data, compose):
-        timerFired(data,compose)
-        redrawAllWrapper(canvas, data, compose)
+    def timerFiredWrapper(canvas, data, compose, play):
+        timerFired(data,compose, play)
+        redrawAllWrapper(canvas, data, compose,play)
         # pause, then call timerFired again
-        canvas.after(data.timerDelay, timerFiredWrapper, canvas, data, compose)
+        canvas.after(data.timerDelay, timerFiredWrapper, canvas, data, compose, play)
     # Set up data and call init
     class Struct(object): pass
     class Compose(object): pass
+    class Play(object): pass
     data = Struct()
     compose = Compose()
+    play = Play()
     data.width = width
     data.height = height
     data.timerDelay = 100 # milliseconds
-    init(data, compose)
+    init(data, compose, play)
     # create the root and the canvas
     root = Tk()
     canvas = Canvas(root, width=data.width, height=data.height)
     canvas.pack()
     # set up events
     root.bind("<Button-1>", lambda event:
-                            mousePressedWrapper(event, canvas, data, compose))
+                            mousePressedWrapper(event, canvas, data, compose, play))
     root.bind("<Key>", lambda event:
-                            keyPressedWrapper(event, canvas, data, compose))
-    timerFiredWrapper(canvas, data, compose)
+                            keyPressedWrapper(event, canvas, data, compose, play))
+    timerFiredWrapper(canvas, data, compose, play)
     # and launch the app
     root.mainloop()  # blocks until window is closed
     print("bye!")
