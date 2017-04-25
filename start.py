@@ -1,6 +1,8 @@
 # mode-demo.py
 
 from tkinter import *
+import pyaudio  
+import wave 
 
 ####################################
 # init
@@ -35,6 +37,8 @@ def init(data, compose, play):
     compose.playButtonCenter = ((95)/2, 35/2)
     compose.hearButtonCoords = (data.width - 105, 5, data.width - 5, 40)
     compose.hearButtonCenter = (745, 35/2)
+    compose.YPlace = compose.topStaff
+    compose.count = 0
     #HEAR
     play.rightStaff, play.leftStaff = compose.rightStaff, compose.leftStaff
     play.topStaff = data.height // 5
@@ -55,7 +59,7 @@ def mousePressed(event, data, compose, play):
 def keyPressed(event, data, compose, play):
     if (data.mode == "compose"): composeKeyPressed(event, data,compose)
     elif (data.mode == "play"):   playKeyPressed(event, data, play)
-    elif (data.mode == "hear"):       hearKeyPressed(event, data)
+    elif (data.mode == "hear"):       hearKeyPressed(event, data, compose)
 
 def timerFired(data, compose, play):
     if (data.mode == "compose"): composeTimerFired(data,compose)
@@ -65,7 +69,7 @@ def timerFired(data, compose, play):
 def redrawAll(canvas, data,compose, play):
     if (data.mode == "compose"): composeRedrawAll(canvas, data,compose)
     elif (data.mode == "play"):   playRedrawAll(canvas, data,compose, play)
-    elif (data.mode == "hear"):       hearRedrawAll(canvas, data)
+    elif (data.mode == "hear"):       hearRedrawAll(canvas, data, compose, play)
 
 ####################################
 # compose mode
@@ -85,7 +89,7 @@ def addNote(n, compose, start):
     if num == 40: note = "E2"
     if num == 45: note = "D2"
     if num == 50: note = "C3"
-    compose.notes.append((note, "1/4", n))
+    compose.notes.append([note, "1/4", n])
     print (compose.notes)
     return
 
@@ -141,28 +145,52 @@ def drawHearButton(canvas, compose, data):
 
 def drawQuarterNote(canvas, x,y, color):
     radius = 5 #arbitrary for now
+    noteHeight = 20
     canvas.create_oval(x-radius,y-radius, x+radius,y+radius, fill = color)
+    canvas.create_line(x+radius, y, x+radius, y-noteHeight)
 
 def drawNotes(canvas, compose, data):
-    for note in compose.notes:
-        x = compose.noteXPlace
-        if x > compose.noteXLimit:
-            x = compose.rightStaff //20 + compose.leftStaff
-            compose.notexPlace = x
-            print (compose.notexPlace)
-            compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
-        y = note[2]
-        if note[1] == '1/4':
-            drawQuarterNote(canvas,x,y, "black")
-        compose.noteXPlace += compose.noteSpace
-        # print (compose.noteXPlace)
-    compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
+    if compose.notes != []:
+        for i in range(len(compose.notes)):
+            x = compose.noteXPlace
+            print ('x=',x)
+            if x >= compose.noteXLimit:
+                if compose.notes[i][2] > compose.notes[i-1][2] + STAFFSPACE:
+                    x = compose.rightStaff //20 + compose.leftStaff
+                    compose.noteXPlace = x
+                else:
+                    if compose.noteCurrStaff > 3: return 
+                    x = compose.rightStaff //20 + compose.leftStaff
+                    compose.noteXPlace = x
+                    compose.YPlace = compose.notes[i][2] 
+                    compose.YPlace += 100
+                    compose.notes[i][2] = compose.YPlace
+                    # print (compose.notexPlace)
+                    compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
+            y = compose.notes[i][2]
+            if compose.notes[i][1] == '1/4':
+                drawQuarterNote(canvas,x,y, "black")
+            compose.noteXPlace += compose.noteSpace
+            if compose.notes[i][1] == "1/4":
+                compose.count += .25
+            if almostEqual(compose.count, 1):
+                compose.count = 0
+                drawBarline(canvas, compose, compose.noteXPlace, compose.noteCurrStaff)
+            print (compose.noteXPlace, "3")
+        print (compose.notes[-1][2], "final y") 
+        compose.noteYPlace = compose.notes[-1][2]
+        compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
+        print ('compose.noteXPlace', compose.noteXPlace)
+        return
+        #there has to be some sort of compose.yplace to keep track, otherwise 
+        # just moves off the staff (downwards)
 
 def drawStaff(canvas, compose, data):
     x0,y0 = compose.leftStaff, compose.topStaff
     x1,y1 = compose.rightStaff, compose.bottomStaff
     currY = y0    #keeps track of where we are on canvas
     while currY < (y1 - 5 * BARHEIGHT + STAFFSPACE):
+        print(currY)
         currY = drawIndivStaff(canvas, compose, currY)
 
 def drawIndivStaff(canvas, compose, currY):
@@ -172,8 +200,19 @@ def drawIndivStaff(canvas, compose, currY):
         ys.append(y0)
         canvas.create_line(compose.leftStaff, y0, compose.rightStaff, y0)
         y0 += BARHEIGHT
+    canvas.create_line(compose.leftStaff, currY, compose.leftStaff, y0 - BARHEIGHT) #drawing left barline
+    canvas.create_line(compose.rightStaff, currY, compose.rightStaff, y0 - BARHEIGHT) #drawing left barline
     compose.bars.append(tuple(ys))
     return y0 + STAFFSPACE
+
+def almostEqual(d1, d2, epsilon=10**-7):
+    # note: use math.isclose() outside 15-112 with Python version 3.5 or later
+    return (abs(d2 - d1) < epsilon)
+
+
+def drawBarline(canvas, compose, x, staff):
+    canvas.create_line(x, compose.bars[staff][0], x, compose.bars[staff][1])
+
 
 
              
@@ -188,21 +227,50 @@ def drawIndivStaff(canvas, compose, currY):
 def hearMousePressed(event, data):
     pass
 
-def hearKeyPressed(event, data):
-    pass
+def hearKeyPressed(event, data, compose):
+    if event.keysym == "p":
+        for note in compose.notes:
+            playNote(note[0])
+            data.timerTrack += 1
 
 def hearTimerFired(data):
     pass
 
-def hearRedrawAll(canvas, data):
-    canvas.create_text(data.width/2, data.height/2-40,
+def hearRedrawAll(canvas, data, compose, play):
+    canvas.create_text(data.width/2, data.height/4 * 3-40,
                        text="This is hear mode!", font="Arial 26 bold")
-    canvas.create_text(data.width/2, data.height/2-10,
-                       text="How to play:", font="Arial 20")
-    canvas.create_text(data.width/2, data.height/2+15,
-                       text="Do nothing and score points!", font="Arial 20")
-    canvas.create_text(data.width/2, data.height/2+40,
-                       text="Press any key to keep playing!", font="Arial 20")
+    canvas.create_text(data.width/2, data.height/4*3, 
+                        text = "press 'p' to hear your composition")
+    drawStaff(canvas, compose, data)
+    drawMovingNotes(canvas, compose, data, play)
+
+def playNote(note):
+    #define stream chunk   
+    chunk = 1024  
+    #open a wav format music  
+    f = wave.open(r"notes/" + note + ".wav","rb")  
+    #instantiate PyAudio  
+    p = pyaudio.PyAudio()  
+    #open stream  
+    stream = p.open(format = p.get_format_from_width(f.getsampwidth()),  
+                    channels = f.getnchannels(),  
+                    rate = f.getframerate(),  
+                    output = True)  
+    #read data  
+    data = f.readframes(chunk)  
+
+    #play stream  
+    while data:  
+        stream.write(data)  
+        data = f.readframes(chunk)  
+
+    #stop stream  
+    stream.stop_stream()  
+    stream.close()  
+
+    #close PyAudio  
+    p.terminate() 
+
 
 ####################################
 # play mode
@@ -229,6 +297,7 @@ def playRedrawAll(canvas, data, compose, play):
 def drawMovingNotes(canvas, compose, data, play):
     if not data.pause: 
         for i in range(len(compose.notes)):
+            print (data.timerTrack)
             x = compose.noteXPlace
             if x > compose.noteXLimit:
                 x = compose.rightStaff //20 + compose.leftStaff
@@ -340,8 +409,10 @@ def run(width=300, height=300):
     root.mainloop()  # blocks until window is closed
     print("bye!")
 
-run(800,600)
+run(800,600) 
 
 
 ####CITE
 # course website, Mode Demo, David Kosbie
+# wave file playing code: Jean-Francois Fabre
+# course website, almostEqual, David Kosbie
