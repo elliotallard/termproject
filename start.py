@@ -1,7 +1,7 @@
 # mode-demo.py
 
 from tkinter import *
-import pyaudio  
+#import pyaudio  
 import wave 
 
 ####################################
@@ -23,10 +23,11 @@ def init(data, compose, play):
     data.timerTrack = 0 # if this is odd or even, tells when to switch notes
     data.pause = False
     #COMPOSE
+    compose.redoNotes = []
     compose.notes = []   
     compose.topStaff = data.height//20 * 2
     compose.bottomStaff = data.height//2       
-    compose.leftStaff = data.width//20
+    compose.leftStaff = data.width//20 + 50
     compose.rightStaff = data.width//20 * 19  
     compose.bars = []    #keeps locations of lines when drawing bars, can ref back to notes 
     compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
@@ -39,6 +40,13 @@ def init(data, compose, play):
     compose.hearButtonCenter = (745, 35/2)
     compose.YPlace = compose.topStaff
     compose.count = 0
+    timeStr = input("Input a time signature: \n")
+    if timeStr == "4/4":
+        compose.timeSig = 1
+    if timeStr == "2/4":
+        compose.timeSig = .5
+    if timeStr == "3/4":
+        compose.timeSig = .75
     #HEAR
     play.rightStaff, play.leftStaff = compose.rightStaff, compose.leftStaff
     play.topStaff = data.height // 5
@@ -76,22 +84,39 @@ def redrawAll(canvas, data,compose, play):
 ####################################
 
 def addNote(n, compose, start):
+    compose.redoNotes = []
+    lines = 0 #whether or not to draw lines above or below staff for reference
+    note = ""
     # print (n)
     num = n - start
-    if num == 0: note = "F1"
-    if num == 5: note = "E1"
-    if num == 10: note = "D1"
-    if num == 15: note = "C2"
-    if num == 20: note = "B2"
-    if num == 25: note = "A2"
-    if num == 30: note = "G2"
-    if num == 35: note = "F2"
-    if num == 40: note = "E2"
-    if num == 45: note = "D2"
-    if num == 50: note = "C3"
-    compose.notes.append([note, "1/4", n])
-    print (compose.notes)
-    return
+    if num == 0: note = "D0"
+    if num == 5: note = "C1"
+    if num == 10: note = "B1"
+    if num == 15: note = "A1"
+    if num == 20: note = "G1"
+    if num == 25: note = "F1"
+    if num == 30: note = "E1"
+    if num == 35: note = "D1"
+    if num == 40: note = "C2"
+    if num == 45: note = "B2"
+    if num == 50: note = "A2"
+    if num == 55: note = "G2"
+    if num == 60: note = "F2"
+    if num == 65: note = "E2"
+    if num == 70: note = "D2"
+    if num == 75: note = "C3"
+    if num == 0:
+        lines = 4
+    if num == 5:
+        lines = 3
+    if num == 10:
+        lines = 2
+    if num == 15:
+        lines = 1
+    if num == 75:
+        lines = -1
+    compose.notes.append([note, "1/4", n, lines])
+    compose.redoNotes.append([note, "1/4",n, lines])
 
 
 def composeMousePressed(event, data,compose):
@@ -102,16 +127,28 @@ def composeMousePressed(event, data,compose):
         compose.hearButtonCoords[1] < event.y < compose.hearButtonCoords[3]):
         data.mode = "hear"
     for staff in compose.bars:
-        start = staff[0] #getting first and last values of each bar
-        end = staff[-1]
+        start = staff[0] - 2*BARHEIGHT - 5 #getting first and last values of each bar
+        end = staff[-1] + 2*BARHEIGHT - 5
         # print (staff)
         for step in range(start, end + 5, 5): #going through the staff, bar by bar
             if step - 3 < event.y < step + 3:
                 addNote(step, compose, start)
                 return
 
+def undoNote(compose):
+	if compose.notes != []:
+		compose.redoNotes.append(compose.notes.pop(-1))
+
+def redoNote(compose):
+	if compose.redoNotes != []:
+		compose.notes.append(compose.redoNotes.pop(-1))
+
 
 def composeKeyPressed(event, data,compose):
+    if event.keysym == "u":
+        undoNote(compose)
+    if event.keysym == "r":
+        redoNote(compose)
     if event.keysym == "Up": 
         if data.tempo < 225: data.tempo += 1
     if event.keysym == "Down":
@@ -128,6 +165,7 @@ def composeRedrawAll(canvas, data,compose):
     drawPlayButton(canvas, compose, data)
     drawHearButton(canvas, compose, data)
     drawTempoMsg(canvas, compose, data)
+    canvas.create_text(data.width/2, data.height - 20, text = "Press 'u' to undo note,'r'to redo")
 
 def drawTempoMsg(canvas, compose, data):
     tempoMsg = "Press up and down arrows to change tempo. Tempo = %d" % (data.tempo)
@@ -143,14 +181,29 @@ def drawHearButton(canvas, compose, data):
     canvas.create_rectangle(compose.hearButtonCoords, fill = "red")
     canvas.create_text(compose.hearButtonCenter, text = play)
 
-def drawQuarterNote(canvas, x,y, color):
+def drawQuarterNote(canvas, x,y, color, lines):
     radius = 5 #arbitrary for now
     noteHeight = 20
+    lineRadius = 8
     canvas.create_oval(x-radius,y-radius, x+radius,y+radius, fill = color)
     canvas.create_line(x+radius, y, x+radius, y-noteHeight)
+    if lines != None and lines!= 0:
+        if lines == 4: #high D
+            canvas.create_line(x - lineRadius, y+.5*BARHEIGHT, x+lineRadius,y+BARHEIGHT*(.5))
+            canvas.create_line(x - lineRadius, y+(3/2)*BARHEIGHT, x+lineRadius,y+BARHEIGHT*(3/2))
+        if lines == 3: #high C
+            canvas.create_line(x - lineRadius, y, x+lineRadius,y)
+            canvas.create_line(x - lineRadius, y+BARHEIGHT, x+lineRadius,y+BARHEIGHT)
+        if lines == 2: #high B
+            canvas.create_line(x - lineRadius, y+.5*BARHEIGHT, x+lineRadius,y+BARHEIGHT*(.5))
+        if lines == 1: #high A
+            canvas.create_line(x - lineRadius, y, x+lineRadius,y)
+        if lines == -1: #low C
+            canvas.create_line(x - lineRadius, y, x+lineRadius,y)
 
 def drawNotes(canvas, compose, data):
     if compose.notes != []:
+        compose.count = 0
         for i in range(len(compose.notes)):
             x = compose.noteXPlace
             print ('x=',x)
@@ -169,18 +222,20 @@ def drawNotes(canvas, compose, data):
                     compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
             y = compose.notes[i][2]
             if compose.notes[i][1] == '1/4':
-                drawQuarterNote(canvas,x,y, "black")
+                if compose.notes[i][3] != 0:
+                    drawQuarterNote(canvas, x, y, "black", compose.notes[i][3])
+                else:
+                    drawQuarterNote(canvas,x,y, "black", None)
+                    
             compose.noteXPlace += compose.noteSpace
             if compose.notes[i][1] == "1/4":
                 compose.count += .25
-            if almostEqual(compose.count, 1):
+            if almostEqual(compose.count, compose.timeSig):
                 compose.count = 0
-                drawBarline(canvas, compose, compose.noteXPlace, compose.noteCurrStaff)
-            print (compose.noteXPlace, "3")
-        print (compose.notes[-1][2], "final y") 
+                print (compose.noteCurrStaff, 'currStaff' )
+                drawBarline(canvas, compose,compose.noteXPlace-(.5*compose.noteSpace), compose.noteCurrStaff) 
         compose.noteYPlace = compose.notes[-1][2]
         compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
-        print ('compose.noteXPlace', compose.noteXPlace)
         return
         #there has to be some sort of compose.yplace to keep track, otherwise 
         # just moves off the staff (downwards)
@@ -211,7 +266,7 @@ def almostEqual(d1, d2, epsilon=10**-7):
 
 
 def drawBarline(canvas, compose, x, staff):
-    canvas.create_line(x, compose.bars[staff][0], x, compose.bars[staff][1])
+    canvas.create_line(x, compose.bars[staff][0], x, compose.bars[staff][-1])
 
 
 
@@ -230,7 +285,7 @@ def hearMousePressed(event, data):
 def hearKeyPressed(event, data, compose):
     if event.keysym == "p":
         for note in compose.notes:
-            playNote(note[0])
+           # playNote(note[0])
             data.timerTrack += 1
 
 def hearTimerFired(data):
@@ -244,7 +299,7 @@ def hearRedrawAll(canvas, data, compose, play):
     drawStaff(canvas, compose, data)
     drawMovingNotes(canvas, compose, data, play)
 
-def playNote(note):
+#def playNote(note):
     #define stream chunk   
     chunk = 1024  
     #open a wav format music  
@@ -297,27 +352,25 @@ def playRedrawAll(canvas, data, compose, play):
 def drawMovingNotes(canvas, compose, data, play):
     if not data.pause: 
         for i in range(len(compose.notes)):
-            print (data.timerTrack)
             x = compose.noteXPlace
             if x > compose.noteXLimit:
                 x = compose.rightStaff //20 + compose.leftStaff
                 compose.notexPlace = x
-                print (compose.notexPlace)
                 compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
             y = compose.notes[i][2]
             if compose.notes[i][1] == '1/4':
                 if i == data.timerTrack:
                     play.note = compose.notes[i][0]
-                    drawQuarterNote(canvas,x,y, "red")
+                    drawQuarterNote(canvas,x,y, "red", compose.notes[i][3])
                 else:
-                    drawQuarterNote(canvas, x, y, "black")
+                    drawQuarterNote(canvas, x, y, "black", compose.notes[i][3])
             compose.noteXPlace += compose.noteSpace
             # print (compose.noteXPlace)
         compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
 
 def drawFingerings(canvas, compose, data, play):
     canvas.create_rectangle(0,data.height/2, data.width/2, data.height, fill = "white")
-    if play.note == "" or play.note == "C#1":
+    if play.note == "":
         noteList = [0,0,0,0,0,0,0] #(octave key, 1,2,3,4,5,6)
     elif play.note == "F1":noteList = [1,1,1,1,1,0,0]
     elif play.note == "E1":noteList = [1,1,1,1,1,1,0]
