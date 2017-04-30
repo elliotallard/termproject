@@ -61,7 +61,6 @@ def init(data, compose, play):
     compose.YPlace = compose.topStaff
     compose.count = 0
     compose.timeSig = 1
-
     # compose.timeSig = input("Input a time signature: \n")
     #HEAR
     play.rightStaff, play.leftStaff = compose.rightStaff, compose.leftStaff
@@ -99,8 +98,7 @@ def redrawAll(canvas, data,compose, play):
 # compose mode
 ####################################
 
-def addNote(n, compose, start):
-    compose.redoNotes = []
+def addNote(n, compose, start, staff):
     lines = 0 #whether or not to draw lines above or below staff for reference
     note = ""
     # print (n)
@@ -121,6 +119,7 @@ def addNote(n, compose, start):
     if num == 65: note = "E2"
     if num == 70: note = "D2"
     if num == 75: note = "C3"
+    if num == 80: note =  'B3'
     if num == 0:
         lines = 4
     if num == 5:
@@ -131,8 +130,11 @@ def addNote(n, compose, start):
         lines = 1
     if num == 75:
         lines = -1
-    compose.notes.append([note, "1/4", n, lines])
-    compose.redoNotes.append([note, "1/4",n, lines])
+    if num == 80:
+        lines = -2
+    compose.notes.append([note, "1/4", n, lines, staff])
+    compose.redoNotes = []
+    # compose.redoNotes.append([note, "1/4",n, lines, staff])
 
 
 def composeMousePressed(event, data,compose):
@@ -142,22 +144,24 @@ def composeMousePressed(event, data,compose):
     if (compose.hearButtonCoords[0] < event.x < compose.hearButtonCoords[2] and
         compose.hearButtonCoords[1] < event.y < compose.hearButtonCoords[3]):
         data.mode = "hear"
-    for staff in compose.bars:
-        start = staff[0] - 2*BARHEIGHT - 5 #getting first and last values of each bar
-        end = staff[-1] + 2*BARHEIGHT - 5
-        # print (staff)
-        for step in range(start, end + 5, 5): #going through the staff, bar by bar
-            if step - 3 < event.y < step + 3:
-                addNote(step, compose, start)
-                return
+    # for staff in compose.bars:
+    start = compose.bars[compose.noteCurrStaff][0] - 2*BARHEIGHT - 5 #getting first and last values of each bar
+    end = compose.bars[compose.noteCurrStaff][-1] + 2*BARHEIGHT - 5
+    # print (staff)
+    for step in range(start, end + 5, 5): #going through the staff, bar by bar
+        if step - 3 < event.y < step + 3:
+            addNote(step, compose, start, compose.noteCurrStaff)
+            return
     timeSigMousePressed(event, data)
     keySigMousePressed(event,data)
 
 def undoNote(compose):
+    print (compose.notes, compose.redoNotes)
     if compose.notes != []:
         compose.redoNotes.append(compose.notes.pop(-1))
 
 def redoNote(compose):
+    print (compose.notes, compose.redoNotes)
     if compose.redoNotes != []:
         compose.notes.append(compose.redoNotes.pop(-1))
 
@@ -223,18 +227,24 @@ def drawQuarterNote(canvas, x,y, color, lines):
             canvas.create_line(x - lineRadius, y, x+lineRadius,y)
         if lines == -1: #low C
             canvas.create_line(x - lineRadius, y, x+lineRadius,y)
+        if lines == -2: #low B
+            canvas.create_line(x-lineRadius, y-(.5*BARHEIGHT),x+lineRadius, y-(.5*BARHEIGHT))
 
 def drawNotes(canvas, compose, data):
     if compose.notes != []:
         compose.count = 0
+        compose.currStaff = 0
+        print (len(compose.notes))
+        if len(compose.notes)>60:
+            del compose.notes[-1]
         for i in range(len(compose.notes)):
             x = compose.noteXPlace
-            if x >= compose.noteXLimit:
+            if x >= compose.noteXLimit -20:
+                print (x, compose.noteXLimit)
                 if compose.notes[i][2] > compose.notes[i-1][2] + STAFFSPACE:
                     x = compose.rightStaff //20 + compose.leftStaff
                     compose.noteXPlace = x
                 else:
-                    if compose.noteCurrStaff > 3: return 
                     x = compose.rightStaff //20 + compose.leftStaff
                     compose.noteXPlace = x
                     compose.YPlace = compose.notes[i][2] 
@@ -247,18 +257,16 @@ def drawNotes(canvas, compose, data):
                 if compose.notes[i][3] != 0:
                     drawQuarterNote(canvas, x, y, "black", compose.notes[i][3])
                 else:
-                    drawQuarterNote(canvas,x,y, "black", None)
-                    
+                    drawQuarterNote(canvas,x,y, "black", None)        
             compose.noteXPlace += compose.noteSpace
             if compose.notes[i][1] == "1/4":
                 compose.count += .25
             if almostEqual(compose.count, compose.timeSig):
                 compose.count = 0
                 print (compose.noteCurrStaff, 'currStaff' )
-                drawBarline(canvas, compose,compose.noteXPlace-(.5*compose.noteSpace), compose.noteCurrStaff) 
+                drawBarline(canvas, compose,compose.noteXPlace-(.5*compose.noteSpace), compose.notes[i][-1]) 
         compose.noteYPlace = compose.notes[-1][2]
         compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
-        return
         #there has to be some sort of compose.yplace to keep track, otherwise 
         # just moves off the staff (downwards)
 
@@ -372,10 +380,7 @@ def keySigKeyPressed(event, data, compose):
                 else:
                     data.keySigString = data.keySigString[:-1]
         elif event.keysym == "space":
-            if len(data.keySigString) > 0 and data.keySigString[-1] == "|":
-                data.keySigString = data.keySigString[:-1] + " "
-            else:
-                data.keySigString = data.keySigString + " "
+            data.keySigString = data.keySigString + " "
         elif event.keysym == "Return":
             data.keySigIsPressed = False
             if data.keySigString in data.keySigs:
@@ -392,17 +397,7 @@ def keySigKeyPressed(event, data, compose):
                     data.keySigString = data.keySigString + event.keysym
 
 def keySigTimerFired(data):
-    data.timerCount+=1
-    if data.timerCount%5 == 0:
-        if data.keySigIsPressed:
-            if data.keySigCursorCoords:
-                data.keySigCursorCoords = False
-                if "|" in data.keySigString:
-                    index = data.keySigString.index("|")
-                    data.keySigString = data.keySigString[:index] + data.keySigString[index+1:]
-            else:
-                data.keySigCursorCoords = True
-                data.keySigString += "|"
+    pass
 
 def keySigRedrawAll(canvas, data):
     canvas.create_rectangle(data.keySigRectCoords, fill = "green")
@@ -505,7 +500,29 @@ def drawMovingNotes(canvas, compose, data, play):
 def drawFingerings(canvas, compose, data, play):
     canvas.create_rectangle(0,data.height/2, data.width/2, data.height, fill = "white")
     if play.note == "":
-        noteList = [0,0,0,0,0,0,0] #(octave key, 1,2,3,4,5,6)
+        noteList = [0,0,0,0,0,0,0] #(octave key, 1,2,3,4,5,6, left special (top, left, right, bottom), low special (top, bottom), top special)
+    noteList = getNoteList(compose, play.note)
+    for i in range(len(noteList)):
+        if noteList[0] == 1: #octave key:
+            drawOctaveKey(canvas, "red", data)
+        else: drawOctaveKey(canvas, "white", data)
+        if i in range(1, 7):
+            if noteList[i] == 0:
+                drawDigitKey(canvas, "white", i, data)
+            else: drawDigitKey(canvas, "red", i, data)
+
+def getNoteList(compose, note):
+    if play.note == "D0":
+        if compose.keySig in ["C", "D", "Eb","F","G","Ab","A","Bb"]
+            return ALLNOTES["D0"]
+        else:
+            return ALLNOTES["Db0"]
+    elif play.note == "C1":
+        if compose.keySig in ["D"]
+
+    elif play.note == "B1":
+    elif play.note == "A1":
+    elif play.note == "G1":
     elif play.note == "F1":noteList = [1,1,1,1,1,0,0]
     elif play.note == "E1":noteList = [1,1,1,1,1,1,0]
     elif play.note == "D1":noteList = [1,1,1,1,1,1,1]
@@ -515,15 +532,47 @@ def drawFingerings(canvas, compose, data, play):
     elif play.note == "G2":noteList = [0,1,1,1,0,0,0]
     elif play.note == "F2":noteList = [0,1,1,1,1,0,0]
     elif play.note == "E2":noteList = [0,1,1,1,1,1,0]
-    elif play.note == "D2": noteList = [0,1,1,1,1,1,1]
-    for i in range(len(noteList)):
-        if noteList[0] == 1: #octave key:
-            drawOctaveKey(canvas, "red", data)
-        else: drawOctaveKey(canvas, "white", data)
-        if i in range(1, 7):
-            if noteList[i] == 0:
-                drawDigitKey(canvas, "white", i, data)
-            else: drawDigitKey(canvas, "red", i, data)
+    elif play.note == "D2":noteList = [0,1,1,1,1,1,1]
+    elif play.note == "C3":
+    elif play.note == "B3":
+
+def getNote(key, note):
+    if note == 
+
+ALLNOTES = {"D0"; [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                "Db0";[1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "C1"; [1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+                "Bb1";[1,1,0,0,1,0,0,0,0,0,0,0,0,0],
+                "B1"; [1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+                "A1";  [1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+                "Ab1"; [1,1,1,0,0,0,0,1,0,0,0,0,0,0],
+                "G1";  [1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+                "Gb1"; [1,1,1,1,0,1,0,0,0,0,0,0,0,0],
+                "F1"; [1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+                "E1"; [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+                "Eb1";[1,1,1,1,1,1,1,0,0,0,0,1,0,0],
+                "D1"; [1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+                "Db1";[0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "C2"; [0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+                "B2"; [0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+                "Bb2";[0,1,0,0,1,0,0,0,0,0,0,0,0,0],
+                "A2"; [0,1,1,0,0,0,0,0,0,0,0,0,0,0],
+                "Ab2";[0,1,1,0,0,0,0,1,0,0,0,0,0,0],
+                "G2"; [0,1,1,1,0,0,0,0,0,0,0,0,0,0],
+                "Gb2";[0,1,1,1,0,1,0,0,0,0,0,0,0,0],
+                "F2"; [0,1,1,1,1,0,0,0,0,0,0,0,0,0],
+                "E2"; [0,1,1,1,1,1,0,0,0,0,0,0,0,0],
+                "Eb2";[0,1,1,1,1,1,1,0,0,0,0,1,0,0],
+                "D2"; [0,1,1,1,1,1,1,0,0,0,0,0,0,0],
+                "Db2";[0,1,1,1,1,1,1,0,0,1,0,0,1,0],
+                "C3"; [0,1,1,1,1,1,1,0,0,0,0,0,1,0],
+                "B3"; [0,1,1,1,1,1,1,0,1,0,0,0,1,0]
+    }
+
+
+def drawLeftSpecial(canvas, colors, data):
+
+def drawBottomSpecial(canvas, colors)
 
 def drawOctaveKey(canvas, color, data):
     distFromStaff = 25
