@@ -10,7 +10,36 @@ import wave
 
 BARHEIGHT = 10
 STAFFSPACE = 50
-
+ALLNOTES = { #fingerings for each note
+                 "D0": [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                "Db0":[1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "C1": [1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+                "Bb1":[1,1,0,0,1,0,0,0,0,0,0,0,0,0],
+                "B1":[1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+                "A1":  [1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+                "Ab1": [1,1,1,1,0,0,0,1,0,0,0,0,0,0],
+                "G1": [1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+                "Gb1": [1,1,1,1,0,1,0,0,0,0,0,0,0,0],
+                "F1":[1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+                "E1": [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+                "Eb1":[1,1,1,1,1,1,1,0,0,0,0,1,0,0],
+                "D1":[1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+                "Db1":[0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "C2": [0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+                "B2": [0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+                "Bb2":[0,1,0,0,1,0,0,0,0,0,0,0,0,0],
+                "A2": [0,1,1,0,0,0,0,0,0,0,0,0,0,0],
+                "Ab2":[0,1,1,1,0,0,0,1,0,0,0,0,0,0],
+                "G2": [0,1,1,1,0,0,0,0,0,0,0,0,0,0],
+                "Gb2":[0,1,1,1,0,1,0,0,0,0,0,0,0,0],
+                "F2": [0,1,1,1,1,0,0,0,0,0,0,0,0,0],
+                "E2": [0,1,1,1,1,1,0,0,0,0,0,0,0,0],
+                "Eb2":[0,1,1,1,1,1,1,0,0,0,0,1,0,0],
+                "D2": [0,1,1,1,1,1,1,0,0,0,0,0,0,0],
+                "Db2":[0,1,1,1,1,1,1,0,0,1,0,0,1,0],
+                "C3": [0,1,1,1,1,1,1,0,0,0,0,0,1,0],
+                "B3": [0,1,1,1,1,1,1,0,1,0,0,0,1,0]
+    }
 
 #keeps all compose variables  
 
@@ -42,9 +71,17 @@ def init(data, compose, play):
     data.timerCount = 0
     data.keySig = ""
     data.keySigs = ["C","Db","D", "Eb", "E", "F","Gb", "G", "Ab", "A", "Bb", "B"]
+    data.rightSpecialTopCoords = (data.width/4+20,data.height*3/4-35, data.width/4+50, data.height*3/4-20)
+    data.rightSpecialLeftCoords = (data.width/4+20, data.height*3/4-20, data.width/4+35, data.height*3/4-10)
+    data.rightSpecialRightCoords = (data.width/4+35,data.height*3/4-20,data.width/4+50,data.height*3/4-10)
+    data.rightSpecialBottomCoords = (data.width/4+20, data.height*3/4-10,data.width/4+50,data.height*3/4+5)
+    data.bottomSpecialTopCoords = (data.width/4-50, data.height-45,data.width/4-20,data.height-30)
+    data.bottomSpecialBottomCoords=(data.width/4-50, data.height-30,data.width/4-20,data.height-15)
     #COMPOSE
+    compose.keySig = "C"
     compose.redoNotes = []
-    compose.notes = []   
+    compose.notes = [] 
+    compose.keySigNotes = []  
     compose.topStaff = data.height//20 * 2
     compose.bottomStaff = data.height//2       
     compose.leftStaff = data.width//20 + 50
@@ -76,13 +113,13 @@ def init(data, compose, play):
 
 def mousePressed(event, data, compose, play):
     if (data.mode == "compose"): composeMousePressed(event, data, compose)
-    elif (data.mode == "play"):   playMousePressed(event, data, play)
+    elif (data.mode == "play"):   playMousePressed(event, data, play, compose)
     elif (data.mode == "hear"):       hearMousePressed(event, data)
 
 def keyPressed(event, data, compose, play):
     if (data.mode == "compose"): composeKeyPressed(event, data,compose)
     elif (data.mode == "play"):   playKeyPressed(event, data, play)
-    elif (data.mode == "hear"):       hearKeyPressed(event, data, compose)
+    elif (data.mode == "hear"):       hearKeyPressed(event, data, compose,play)
 
 def timerFired(data, compose, play):
     if (data.mode == "compose"): composeTimerFired(data,compose)
@@ -90,7 +127,7 @@ def timerFired(data, compose, play):
     elif (data.mode == "hear"):       hearTimerFired(data)
 
 def redrawAll(canvas, data,compose, play):
-    if (data.mode == "compose"): composeRedrawAll(canvas, data,compose)
+    if (data.mode == "compose"): composeRedrawAll(canvas, data,compose,play)
     elif (data.mode == "play"):   playRedrawAll(canvas, data,compose, play)
     elif (data.mode == "hear"):       hearRedrawAll(canvas, data, compose, play)
 
@@ -103,23 +140,84 @@ def addNote(n, compose, start, staff):
     note = ""
     # print (n)
     num = n - start
-    if num == 0: note = "D0"
-    if num == 5: note = "C1"
-    if num == 10: note = "B1"
-    if num == 15: note = "A1"
-    if num == 20: note = "G1"
-    if num == 25: note = "F1"
-    if num == 30: note = "E1"
-    if num == 35: note = "D1"
-    if num == 40: note = "C2"
-    if num == 45: note = "B2"
-    if num == 50: note = "A2"
-    if num == 55: note = "G2"
-    if num == 60: note = "F2"
-    if num == 65: note = "E2"
-    if num == 70: note = "D2"
-    if num == 75: note = "C3"
-    if num == 80: note =  'B3'
+    if num == 0: 
+        note = "D0"
+        if compose.keySig in ["B", "E"]: compose.keySigNotes.append("Eb1")
+        elif compose.keySig in ["Db", "Gb","Ab"]: compose.keySigNotes.append("Db0")
+        else: compose.keySigNotes.append("D0")
+    if num == 5: 
+        note = "C1"
+        if compose.keySig in ["C","Db","Eb","F","G","Ab","Bb"]: compose.keySigNotes.append("C1")
+        elif compose.keySig == "Gb": compose.keySigNotes.append("B1")
+        else: compose.keySigNotes.append("Db0")
+    if num == 10: 
+        note = "B1"
+        if compose.keySig in ["C","D","E","G","A","B"]: compose.keySigNotes.append("B1")
+        else: compose.keySigNotes.append("Bb1")
+    if num == 15: 
+        note = "A1"
+        if compose.keySig in "B": compose.keySigNotes.append("Bb1")
+        elif compose.keySig in ["Gb", "Ab", "Eb","Db"]: compose.keySigNotes.append("Ab1")
+        else: compose.keySigNotes.append("A1") 
+    if num == 20: 
+        note = "G1"
+        if compose.keySig in ["Gb", "Db"]: compose.keySigNotes.append("Gb1")
+        elif compose.keySig in ["E", "A", "B"]: compose.keySigNotes.append("Ab1")
+        else: compose.keySigNotes.append("G1")
+    if num == 25: 
+        note = "F1"
+        if compose.keySig in ["G", "D","A","E","B"]: compose.keySigNotes.append("Gb1")
+        else: compose.keySigNotes.append("F1")
+    if num == 30: 
+        note = "E1"
+        if compose.keySig in ["Db","Eb","Gb","Ab","Bb"]: compose.keySigNotes.append('Eb1')
+        else: compose.keySigNotes.append("E1")
+    if num == 35: 
+        note = "D1"
+        if compose.keySig in ["B", "E"]: compose.keySigNotes.append("Eb1")
+        elif compose.keySig in ["Db", "Gb","Ab"]: compose.keySigNotes.append("Db1")
+        else: compose.keySigNotes.append("D1")
+    if num == 40:
+        note = "C2"
+        if compose.keySig in ["C","Db","Eb","F","G","Ab","Bb"]: compose.keySigNotes.append("C2")
+        elif compose.keySig == "Gb": compose.keySigNotes.append("B2")
+        else: compose.keySigNotes.append("Db1 ")
+    if num == 45: 
+        note = "B2"
+        if compose.keySig in ["C","D","E","G","A","B"]: compose.keySigNotes.append("B2")
+        else: compose.keySigNotes.append("Bb2")
+    if num == 50: 
+        note = "A2"
+        if compose.keySig in "B": compose.keySigNotes.append("Bb2")
+        elif compose.keySig in ["Gb", "Ab", "Eb","Db"]: compose.keySigNotes.append("Ab2")
+        else: compose.keySigNotes.append("A2") 
+    if num == 55: 
+        note = "G2"
+        if compose.keySig in ["Gb", "Db"]: compose.keySigNotes.append("Gb2")
+        elif compose.keySig in ["E", "A", "B"]: compose.keySigNotes.append("Ab2")
+        else: compose.keySigNotes.append("G2")
+    if num == 60: 
+        note = "F2"
+        if compose.keySig in ["G", "D","A","E","B"]: compose.keySigNotes.append("Gb2")
+        else: compose.keySigNotes.append("F2")
+    if num == 65: 
+        note = "E2"
+        if compose.keySig in ["Db","Eb","Gb","Ab","Bb"]: compose.keySigNotes.append('Eb2')
+        else: compose.keySigNotes.append("E2")
+    if num == 70: 
+        note = "D2"
+        if compose.keySig in ["B", "E"]: compose.keySigNotes.append("Eb2")
+        elif compose.keySig in ["Db", "Gb","Ab"]: compose.keySigNotes.append("Db2")
+        else: compose.keySigNotes.append("D2")
+    if num == 75: 
+        note = "C3"
+        if compose.keySig in ["C","Db","Eb","F","G","Ab","Bb"]: compose.keySigNotes.append("C3")
+        elif compose.keySig == "Gb": compose.keySigNotes.append("B3")
+        else: compose.keySigNotes.append("Db2")
+    if num == 80: 
+        note =  'B3'
+        if compose.keySig in ["C","D","E","G","A","B"]: compose.keySigNotes.append("B3")
+        else: compose.keySigNotes.append("Bb2")
     if num == 0:
         lines = 4
     if num == 5:
@@ -134,7 +232,7 @@ def addNote(n, compose, start, staff):
         lines = -2
     compose.notes.append([note, "1/4", n, lines, staff])
     compose.redoNotes = []
-    # compose.redoNotes.append([note, "1/4",n, lines, staff])
+
 
 
 def composeMousePressed(event, data,compose):
@@ -156,12 +254,10 @@ def composeMousePressed(event, data,compose):
     keySigMousePressed(event,data)
 
 def undoNote(compose):
-    print (compose.notes, compose.redoNotes)
     if compose.notes != []:
         compose.redoNotes.append(compose.notes.pop(-1))
 
 def redoNote(compose):
-    print (compose.notes, compose.redoNotes)
     if compose.redoNotes != []:
         compose.notes.append(compose.redoNotes.pop(-1))
 
@@ -182,13 +278,13 @@ def composeTimerFired(data,compose):
     timeSigTimerFired(data)
     keySigTimerFired(data)
 
-def composeRedrawAll(canvas, data,compose):
+def composeRedrawAll(canvas, data,compose, play):
     x0,y0 = compose.leftStaff, compose.topStaff
     x1,y1 = compose.rightStaff, compose.bottomStaff
     drawStaff(canvas, compose, data)
-    drawNotes(canvas, compose, data)
+    drawNotes(canvas, compose, data, play)
     drawPlayButton(canvas, compose, data)
-    drawHearButton(canvas, compose, data)
+    drawHearButton(canvas, compose, data, play)
     drawTempoMsg(canvas, compose, data)
     canvas.create_text(data.width/2, data.height - 20, text = "Press 'u' to undo note,'r'to redo")
     timeSigRedrawAll(canvas, data)
@@ -214,7 +310,7 @@ def drawQuarterNote(canvas, x,y, color, lines):
     lineRadius = 8
     canvas.create_oval(x-radius,y-radius, x+radius,y+radius, fill = color)
     canvas.create_line(x+radius, y, x+radius, y-noteHeight)
-    if lines != None and lines!= 0:
+    if lines!= 0:
         if lines == 4: #high D
             canvas.create_line(x - lineRadius, y+.5*BARHEIGHT, x+lineRadius,y+BARHEIGHT*(.5))
             canvas.create_line(x - lineRadius, y+(3/2)*BARHEIGHT, x+lineRadius,y+BARHEIGHT*(3/2))
@@ -230,17 +326,15 @@ def drawQuarterNote(canvas, x,y, color, lines):
         if lines == -2: #low B
             canvas.create_line(x-lineRadius, y-(.5*BARHEIGHT),x+lineRadius, y-(.5*BARHEIGHT))
 
-def drawNotes(canvas, compose, data):
+def drawNotes(canvas, compose, data, play):
     if compose.notes != []:
         compose.count = 0
         compose.currStaff = 0
-        print (len(compose.notes))
         if len(compose.notes)>60:
             del compose.notes[-1]
         for i in range(len(compose.notes)):
             x = compose.noteXPlace
             if x >= compose.noteXLimit -20:
-                print (x, compose.noteXLimit)
                 if compose.notes[i][2] > compose.notes[i-1][2] + STAFFSPACE:
                     x = compose.rightStaff //20 + compose.leftStaff
                     compose.noteXPlace = x
@@ -254,16 +348,16 @@ def drawNotes(canvas, compose, data):
                     compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
             y = compose.notes[i][2]
             if compose.notes[i][1] == '1/4':
-                if compose.notes[i][3] != 0:
-                    drawQuarterNote(canvas, x, y, "black", compose.notes[i][3])
+                if data.mode in ["play","hear"] and data.timerTrack == i:
+                    play.note = compose.notes[i][0]
+                    drawQuarterNote(canvas, x, y, "red", compose.notes[i][3])
                 else:
-                    drawQuarterNote(canvas,x,y, "black", None)        
+                    drawQuarterNote(canvas,x,y, "black", compose.notes[i][3])        
             compose.noteXPlace += compose.noteSpace
             if compose.notes[i][1] == "1/4":
                 compose.count += .25
             if almostEqual(compose.count, compose.timeSig):
                 compose.count = 0
-                print (compose.noteCurrStaff, 'currStaff' )
                 drawBarline(canvas, compose,compose.noteXPlace-(.5*compose.noteSpace), compose.notes[i][-1]) 
         compose.noteYPlace = compose.notes[-1][2]
         compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
@@ -325,7 +419,6 @@ def timeSigKeyPressed(event, data, compose):
             else:
                 data.timeSigString = "Please input a x/4 time signature"
         else:
-            print (event.keysym)
             # if len(event.keysym)==1:
             # print ('hi')
             if len(data.timeSigString) > 0 and data.timeSigString[-1] == "|":
@@ -411,10 +504,11 @@ def keySigRedrawAll(canvas, data):
 def hearMousePressed(event, data):
     pass
 
-def hearKeyPressed(event, data, compose):
+def hearKeyPressed(event, data, compose,play):
     if event.keysym == "p":
-        for note in compose.notes:
-           playNote(note[0])
+        data.timerTrack = 0
+        for note in compose.keySigNotes:
+           playNote(note)
            data.timerTrack += 1
 
 def hearTimerFired(data):
@@ -426,7 +520,7 @@ def hearRedrawAll(canvas, data, compose, play):
     canvas.create_text(data.width/2, data.height/4*3, 
                         text = "press 'p' to hear your composition")
     drawStaff(canvas, compose, data)
-    drawMovingNotes(canvas, compose, data, play)
+    drawNotes(canvas, compose, data, play)
 
 def playNote(note):
     # define stream chunk   
@@ -460,8 +554,13 @@ def playNote(note):
 # play mode
 ####################################
 
-def playMousePressed(event, data, play):
-    data.score = 0
+def playMousePressed(event, data, play, compose):
+    if (compose.playButtonCoords[0] < event.x < compose.playButtonCoords[2] and
+        compose.playButtonCoords[1] < event.y < compose.playButtonCoords[3]):
+        data.mode = "compose"
+    if (compose.hearButtonCoords[0] < event.x < compose.hearButtonCoords[2] and
+        compose.hearButtonCoords[1] < event.y < compose.hearButtonCoords[3]):
+        data.mode = "hear"
 
 def playKeyPressed(event, data,play):
     if event.keysym == "Up": 
@@ -472,36 +571,23 @@ def playKeyPressed(event, data,play):
 def playTimerFired(data,play, compose):
     data.timerTrack += 1
 
+
 def playRedrawAll(canvas, data, compose, play):
     drawStaff(canvas, compose, data)
     drawTempoMsg(canvas, compose, data)
-    drawMovingNotes(canvas, compose, data, play)
+    drawNotes(canvas, compose, data, play)
     drawFingerings(canvas,compose, data, play)
+    drawComposeButton(canvas, compose,data,play)
+    drawHearButton(canvas,compose,data,play)
 
-def drawMovingNotes(canvas, compose, data, play):
-    if not data.pause: 
-        for i in range(len(compose.notes)):
-            x = compose.noteXPlace
-            if x > compose.noteXLimit:
-                x = compose.rightStaff //20 + compose.leftStaff
-                compose.notexPlace = x
-                compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
-            y = compose.notes[i][2]
-            if compose.notes[i][1] == '1/4':
-                if i == data.timerTrack:
-                    play.note = compose.notes[i][0]
-                    drawQuarterNote(canvas,x,y, "red", compose.notes[i][3])
-                else:
-                    drawQuarterNote(canvas, x, y, "black", compose.notes[i][3])
-            compose.noteXPlace += compose.noteSpace
-            # print (compose.noteXPlace)
-        compose.noteXPlace = compose.rightStaff //20 + compose.leftStaff
+
 
 def drawFingerings(canvas, compose, data, play):
     canvas.create_rectangle(0,data.height/2, data.width/2, data.height, fill = "white")
     if play.note == "":
-        noteList = [0,0,0,0,0,0,0] #(octave key, 1,2,3,4,5,6, left special (top, left, right, bottom), low special (top, bottom), top special)
-    noteList = getNoteList(compose, play.note)
+        noteList = [0,0,0,0,0,0,0,0,0,0,0,0,0,0] #(octave key, 1,2,3,4,5,6, left special (top, left, right, bottom), low special (top, bottom), top special)
+    else:
+        noteList = ALLNOTES[play.note]
     for i in range(len(noteList)):
         if noteList[0] == 1: #octave key:
             drawOctaveKey(canvas, "red", data)
@@ -510,69 +596,44 @@ def drawFingerings(canvas, compose, data, play):
             if noteList[i] == 0:
                 drawDigitKey(canvas, "white", i, data)
             else: drawDigitKey(canvas, "red", i, data)
-
-def getNoteList(compose, note):
-    if play.note == "D0":
-        if compose.keySig in ["C", "D", "Eb","F","G","Ab","A","Bb"]
-            return ALLNOTES["D0"]
-        else:
-            return ALLNOTES["Db0"]
-    elif play.note == "C1":
-        if compose.keySig in ["D"]
-
-    elif play.note == "B1":
-    elif play.note == "A1":
-    elif play.note == "G1":
-    elif play.note == "F1":noteList = [1,1,1,1,1,0,0]
-    elif play.note == "E1":noteList = [1,1,1,1,1,1,0]
-    elif play.note == "D1":noteList = [1,1,1,1,1,1,1]
-    elif play.note == "C2":noteList = [0,0,1,0,0,0,0]
-    elif play.note == "B2":noteList = [0,1,0,0,0,0,0]
-    elif play.note == "A2":noteList = [0,1,1,0,0,0,0]
-    elif play.note == "G2":noteList = [0,1,1,1,0,0,0]
-    elif play.note == "F2":noteList = [0,1,1,1,1,0,0]
-    elif play.note == "E2":noteList = [0,1,1,1,1,1,0]
-    elif play.note == "D2":noteList = [0,1,1,1,1,1,1]
-    elif play.note == "C3":
-    elif play.note == "B3":
-
-def getNote(key, note):
-    if note == 
-
-ALLNOTES = {"D0"; [1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-                "Db0";[1,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                "C1"; [1,0,1,0,0,0,0,0,0,0,0,0,0,0],
-                "Bb1";[1,1,0,0,1,0,0,0,0,0,0,0,0,0],
-                "B1"; [1,1,0,0,0,0,0,0,0,0,0,0,0,0],
-                "A1";  [1,1,1,0,0,0,0,0,0,0,0,0,0,0],
-                "Ab1"; [1,1,1,0,0,0,0,1,0,0,0,0,0,0],
-                "G1";  [1,1,1,1,0,0,0,0,0,0,0,0,0,0],
-                "Gb1"; [1,1,1,1,0,1,0,0,0,0,0,0,0,0],
-                "F1"; [1,1,1,1,1,0,0,0,0,0,0,0,0,0],
-                "E1"; [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-                "Eb1";[1,1,1,1,1,1,1,0,0,0,0,1,0,0],
-                "D1"; [1,1,1,1,1,1,1,0,0,0,0,0,0,0],
-                "Db1";[0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                "C2"; [0,0,1,0,0,0,0,0,0,0,0,0,0,0],
-                "B2"; [0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-                "Bb2";[0,1,0,0,1,0,0,0,0,0,0,0,0,0],
-                "A2"; [0,1,1,0,0,0,0,0,0,0,0,0,0,0],
-                "Ab2";[0,1,1,0,0,0,0,1,0,0,0,0,0,0],
-                "G2"; [0,1,1,1,0,0,0,0,0,0,0,0,0,0],
-                "Gb2";[0,1,1,1,0,1,0,0,0,0,0,0,0,0],
-                "F2"; [0,1,1,1,1,0,0,0,0,0,0,0,0,0],
-                "E2"; [0,1,1,1,1,1,0,0,0,0,0,0,0,0],
-                "Eb2";[0,1,1,1,1,1,1,0,0,0,0,1,0,0],
-                "D2"; [0,1,1,1,1,1,1,0,0,0,0,0,0,0],
-                "Db2";[0,1,1,1,1,1,1,0,0,1,0,0,1,0],
-                "C3"; [0,1,1,1,1,1,1,0,0,0,0,0,1,0],
-                "B3"; [0,1,1,1,1,1,1,0,1,0,0,0,1,0]
-    }
+        if i in range(7, 11):
+            if noteList[i] == 1:
+                drawRightSpecial(canvas, "red", data, i)
+            else: drawRightSpecial(canvas, "white", data, i)
+        if i in range(11,13):
+            if noteList[i]==1:
+                drawBottomSpecial(canvas, "red", i, data)
+            else: drawBottomSpecial(canvas, "white",i,data)
+        if i == 13:
+            if noteList[i]==1:
+                drawTopSpecial(canvas, "red",data)
+            else:
+                drawTopSpecial(canvas, "white", data)
 
 
-def drawLeftSpecial(canvas, colors, data):
+def drawRightSpecial(canvas, color, data, index):
+    if index==7: #top
+        canvas.create_rectangle(data.rightSpecialTopCoords, fill = color)
+    if index == 8: #left
+        canvas.create_rectangle(data.rightSpecialLeftCoords, fill = color)
+    if index == 9: #right
+        canvas.create_rectangle(data.rightSpecialRightCoords, fill = color)
+    else: #bottom
+        canvas.create_rectangle(data.rightSpecialBottomCoords, fill = color)
 
-def drawBottomSpecial(canvas, colors)
+def drawBottomSpecial(canvas, color, index, data):
+    if index == 11:
+        canvas.create_rectangle(data.bottomSpecialTopCoords, fill = color)
+    else:
+        canvas.create_rectangle(data.bottomSpecialBottomCoords, fill = color)
+
+def drawTopSpecial(canvas, color, data):
+    distFromStaff = 50
+    cx, cy = data.width/8*3/2+ 15, data.height/2 + distFromStaff
+    rx, ry = 7, 12
+    canvas.create_oval(cx-rx,cy-ry,cx+rx,cy+ry, fill = color)
+    canvas.create_text(cx-30, cy, text = "D-Key", font = "Arial 7 bold")
+
 
 def drawOctaveKey(canvas, color, data):
     distFromStaff = 25
@@ -590,6 +651,18 @@ def drawDigitKey(canvas, color, index, data):
     else:
         cx2, cy2 = data.width/4, data.height/4 * 3
         canvas.create_oval(cx2-radius, cy2-radius + (40 * (index-3)), cx2+radius, cy2+radius+ (40 * (index-3)), fill = color)
+
+def drawComposeButton(canvas, compose, data,play):
+    words = "Compose!"
+    canvas.create_rectangle(compose.playButtonCoords, fill = "red")
+    canvas.create_text(compose.playButtonCenter, text = words)
+
+def drawHearButton(canvas, compose, data, play):
+    play = "Hear It!"
+    canvas.create_rectangle(compose.hearButtonCoords, fill = "red")
+    canvas.create_text(compose.hearButtonCenter, text = play)
+
+
 
 ####################################
 # use the run function as-is
