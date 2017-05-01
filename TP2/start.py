@@ -181,7 +181,7 @@ def addNote(n, compose, start, staff):
         note = "C2"
         if compose.keySig in ["C","Db","Eb","F","G","Ab","Bb"]: compose.keySigNotes.append("C2")
         elif compose.keySig == "Gb": compose.keySigNotes.append("B2")
-        else: compose.keySigNotes.append("Db1 ")
+        else: compose.keySigNotes.append("Db1")
     if num == 45: 
         note = "B2"
         if compose.keySig in ["C","D","E","G","A","B"]: compose.keySigNotes.append("B2")
@@ -232,6 +232,7 @@ def addNote(n, compose, start, staff):
         lines = -2
     compose.notes.append([note, "1/4", n, lines, staff])
     compose.redoNotes = []
+    print (compose.keySigNotes)
 
 
 
@@ -239,6 +240,7 @@ def composeMousePressed(event, data,compose):
     if (compose.playButtonCoords[0] < event.x < compose.playButtonCoords[2] and
         compose.playButtonCoords[1] < event.y < compose.playButtonCoords[3]):
         data.mode = "play"
+        data.timerTrack = 0
     if (compose.hearButtonCoords[0] < event.x < compose.hearButtonCoords[2] and
         compose.hearButtonCoords[1] < event.y < compose.hearButtonCoords[3]):
         data.mode = "hear"
@@ -256,6 +258,8 @@ def composeMousePressed(event, data,compose):
 def undoNote(compose):
     if compose.notes != []:
         compose.redoNotes.append(compose.notes.pop(-1))
+    compose.keySigNotes.pop(-1)
+
 
 def redoNote(compose):
     if compose.redoNotes != []:
@@ -349,7 +353,8 @@ def drawNotes(canvas, compose, data, play):
             y = compose.notes[i][2]
             if compose.notes[i][1] == '1/4':
                 if data.mode in ["play","hear"] and data.timerTrack == i:
-                    play.note = compose.notes[i][0]
+                    print (compose.keySigNotes[i])
+                    play.note = compose.keySigNotes[i]
                     drawQuarterNote(canvas, x, y, "red", compose.notes[i][3])
                 else:
                     drawQuarterNote(canvas,x,y, "black", compose.notes[i][3])        
@@ -364,14 +369,15 @@ def drawNotes(canvas, compose, data, play):
         #there has to be some sort of compose.yplace to keep track, otherwise 
         # just moves off the staff (downwards)
 
+
 def drawStaff(canvas, compose, data):
     x0,y0 = compose.leftStaff, compose.topStaff
     x1,y1 = compose.rightStaff, compose.bottomStaff
     currY = y0    #keeps track of where we are on canvas
     while currY < (y1 - 5 * BARHEIGHT + STAFFSPACE):
-        currY = drawIndivStaff(canvas, compose, currY)
+        currY = drawIndivStaff(canvas, compose, currY, data)
 
-def drawIndivStaff(canvas, compose, currY):
+def drawIndivStaff(canvas, compose, currY, data):
     y0 = currY
     ys = [] # temp list that collects all y's then adds to compose.bars at the end
     for i in range(5):
@@ -381,6 +387,13 @@ def drawIndivStaff(canvas, compose, currY):
     canvas.create_line(compose.leftStaff, currY, compose.leftStaff, y0 - BARHEIGHT) #drawing left barline
     canvas.create_line(compose.rightStaff, currY, compose.rightStaff, y0 - BARHEIGHT) #drawing left barline
     compose.bars.append(tuple(ys))
+    top = str(int(compose.timeSig * 4))
+    bottom = "4"
+    distFromStaffLeft = 10
+    f = "Arial 13 bold"
+    canvas.create_text(compose.leftStaff - distFromStaffLeft, currY + ((y0-currY)/4),text = top, font=f)
+    canvas.create_text(compose.leftStaff - distFromStaffLeft, currY + ((y0-currY-BARHEIGHT)/4*3), text = bottom,font=f)
+    drawKeySignature(canvas, compose, currY, y0)
     return y0 + STAFFSPACE
 
 def almostEqual(d1, d2, epsilon=10**-7):
@@ -391,7 +404,37 @@ def almostEqual(d1, d2, epsilon=10**-7):
 def drawBarline(canvas, compose, x, staff):
     canvas.create_line(x, compose.bars[staff][0], x, compose.bars[staff][-1])
 
-
+def drawKeySignature(canvas, compose, startY, endY):
+    startX, endX = compose.leftStaff + 5, compose.leftStaff + 17
+    sX, sY = 4, 5 #space between each element's x and y
+    f = "Arial 13 bold"
+    if compose.keySig == "C": return
+    if compose.keySig in ("G", "D","A","E","B"):
+        sign = "#"
+        if compose.keySig in ["G", "D","A","E","B"]:
+            canvas.create_text(startX,startY,text=sign, font=f)
+        if compose.keySig in ["D","A","E","B"]:
+            canvas.create_text(startX + sX,startY +3*sY, text=sign,font=f)
+        if compose.keySig in ["A","E","B"]:
+            canvas.create_text(startX + 2 *sX, startY + 6*sY,text=sign,font=f)
+        if compose.keySig in ["E","B"]:
+            canvas.create_text(startX+3*sX,startY + 2*sY,text=sign,font=f)
+        if compose.keySig == "B":
+            canvas.create_text(startX + 4*sX,startY+5*sY,text=sign,font=f)
+    else: 
+        sign = "b"
+        if compose.keySig in ["F","Bb","Eb","Ab","Db","Gb"]:
+            canvas.create_text(startX, startY + 4*sY, text = sign,font=f)
+        if compose.keySig in ["Bb","Eb","Ab","Db","Gb"]:
+            canvas.create_text(startX+sX, startY +1*sY, text = sign,font=f)
+        if compose.keySig in ["Eb","Ab","Db","Gb"]:
+            canvas.create_text(startX+sX*2, startY + 5*sY, text = sign,font=f)
+        if compose.keySig in ["Ab","Db","Gb"]:
+            canvas.create_text(startX+sX*3, startY + 2*sY, text = sign,font=f)
+        if compose.keySig in ["Db","Gb"]:
+            canvas.create_text(startX+sX*4, startY + 6*sY, text = sign,font=f)
+        if compose.keySig =="Gb":    
+            canvas.create_text(startX+sX*5, startY + 3*sY, text = sign,font=f)
 ######################################
 #Time Signature Text Box
 
@@ -584,6 +627,7 @@ def playRedrawAll(canvas, data, compose, play):
 
 def drawFingerings(canvas, compose, data, play):
     canvas.create_rectangle(0,data.height/2, data.width/2, data.height, fill = "white")
+    print (play.note)
     if play.note == "":
         noteList = [0,0,0,0,0,0,0,0,0,0,0,0,0,0] #(octave key, 1,2,3,4,5,6, left special (top, left, right, bottom), low special (top, bottom), top special)
     else:
