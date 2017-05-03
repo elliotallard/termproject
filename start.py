@@ -79,6 +79,8 @@ def init(data, compose, play):
     data.notePlayTextCoords = (data.width/2, 35)
     data.helpButtonCoords = (data.width/2 - 100, data.height-35, data.width/2+100, data.height-5) 
     data.helpButtonTextCoords = (data.width/2, data.height - 20)
+    data.isPlaying = False
+
     #COMPOSE
     compose.keySig = "C"
     compose.redoNotes = []
@@ -101,7 +103,7 @@ def init(data, compose, play):
     compose.count = 0
     compose.timeSig = 1
     compose.currStaff = 0
-    #HEAR
+    #PLAY
     play.rightStaff, play.leftStaff = compose.rightStaff, compose.leftStaff
     play.topStaff = data.height // 5
     play.bottomStaff = data.height // 5 + 75
@@ -122,6 +124,11 @@ def init(data, compose, play):
     play.pause = True
     play.noteList = []
 
+    #DATA again, just to get compose.leftStaff
+    data.hearPlayButtonCoords = (compose.leftStaff, data.height*3/4 -20, compose.leftStaff + 200,data.height*3/4 +20)
+    data.hearPauseButtonCoords = (compose.leftStaff + 210,data.height*3/4 -20, compose.rightStaff - 210,data.height*3/4 +20)
+    data.hearReplayButtonCoords=(compose.rightStaff - 200,data.height*3/4 -20,compose.rightStaff,data.height*3/4 +20 )
+
 
 
 ####################################
@@ -135,17 +142,17 @@ def mousePressed(event, data, compose, play):
     elif (data.mode == "note"): noteMousePressed(event, data, compose, play)
     elif (data.mode == "help"): helpMousePressed(event, data)
 
-def keyPressed(event, data, compose, play):
+def keyPressed(event, data, compose, play, canvas):
     if (data.mode == "compose"): composeKeyPressed(event, data,compose)
     elif (data.mode == "play"):   playKeyPressed(event, data, play)
-    elif (data.mode == "hear"):       hearKeyPressed(event, data, compose,play)
+    elif (data.mode == "hear"):       hearKeyPressed(event, data, compose,play, canvas)
     elif (data.mode == "note"): noteKeyPressed(event, data, compose, play)
     elif (data.mode == "help"): pass
 
 def timerFired(data, compose, play):
     if (data.mode == "compose"): composeTimerFired(data,compose)
     elif (data.mode == "play"):   playTimerFired(data, play, compose)
-    elif (data.mode == "hear"):       hearTimerFired(data)
+    elif (data.mode == "hear"):       hearTimerFired(data, compose)
     elif (data.mode == "note"): noteTimerFired()
     elif (data.mode == "help"): pass
 
@@ -296,6 +303,7 @@ def composeMousePressed(event, data,compose):
         data.timerTrack = 0
     if (compose.hearButtonCoords[0] < event.x < compose.hearButtonCoords[2] and
         compose.hearButtonCoords[1] < event.y < compose.hearButtonCoords[3]):
+        data.isPlayingTrack = 0
         data.mode = "hear"
     # for staff in compose.bars:
     start = compose.bars[compose.noteCurrStaff][0] - 2*BARHEIGHT - 5 #getting first and last values of each bar
@@ -421,7 +429,8 @@ def drawNotes(canvas, compose, data, play):
                     compose.noteCurrStaff += 1     #fix later so that music does not go over 6 staffs
             y = compose.notes[i][2]
             if compose.notes[i][1] == '1/4':
-                if data.mode in ["play","hear"] and data.timerTrack == i:
+                print (data.timerTrack, i)
+                if data.mode == "play" and data.timerTrack == i:
                     play.note = compose.keySigNotes[i]
                     drawQuarterNote(canvas, x, y, "red", compose.notes[i][3])
                 else:
@@ -614,25 +623,49 @@ def keySigRedrawAll(canvas, data):
 ####################################
 
 def hearMousePressed(event, data):
+    if (data.hearPlayButtonCoords[0] < event.x < data.hearPlayButtonCoords[2] and
+        data.hearPlayButtonCoords[1] < event.y < data.hearPlayButtonCoords[3]):
+        data.isPlaying = True
+    if (data.hearPauseButtonCoords[0] < event.x < data.hearPauseButtonCoords[2] and
+        data.hearPauseButtonCoords[1] < event.y < data.hearPauseButtonCoords[3]):
+        data.isPlaying = False
+    if (data.hearReplayButtonCoords[0] < event.x < data.hearReplayButtonCoords[2] and
+        data.hearReplayButtonCoords[1] < event.y < data.hearReplayButtonCoords[3]):
+        data.isPlaying = False
+        data.isPlayingTrack = 0 #tracks which note index is currently playing
+    if (data.notePlayButtonCoords[0]<event.x<data.notePlayButtonCoords[2] and 
+        data.notePlayButtonCoords[1]<event.y<data.notePlayButtonCoords[3]):
+        data.mode = "compose"
+
+
+def hearKeyPressed(event, data, compose,play, canvas):
     pass
 
-def hearKeyPressed(event, data, compose,play):
-    if event.keysym == "p":
-        data.timerTrack = 0
-        for note in compose.keySigNotes:
-           playNote(note)
-           data.timerTrack += 1
-
-def hearTimerFired(data):
-    pass
+def hearTimerFired(data, compose):
+    data.timerDelay = 0
+    if data.isPlaying ==  True:
+        if data.isPlayingTrack < len(compose.keySigNotes):
+            playNote(compose.keySigNotes[data.isPlayingTrack])
+            data.isPlayingTrack += 1
 
 def hearRedrawAll(canvas, data, compose, play):
-    canvas.create_text(data.width/2, data.height/4 * 3-40,
-                       text="This is hear mode!", font="Arial 26 bold")
-    canvas.create_text(data.width/2, data.height/4*3, 
-                        text = "press 'p' to hear your composition")
     drawStaff(canvas, compose, data)
     drawNotes(canvas, compose, data, play)
+    drawButtons(canvas, compose, data, play)
+
+def drawButtons(canvas, compose, data, play):
+    font = "Helvetica 19 bold"
+    canvas.create_rectangle(data.hearPlayButtonCoords, fill = "green")
+    canvas.create_text(((data.hearPlayButtonCoords[0] + data.hearPlayButtonCoords[2])/2), 
+        data.height*3/4, text = "Play", font = font)
+    canvas.create_rectangle(data.hearPauseButtonCoords, fill = "white")
+    canvas.create_text(((data.hearPauseButtonCoords[0] + data.hearPauseButtonCoords[2])/2), 
+        data.height*3/4,font = font, text = "Pause")
+    canvas.create_rectangle(data.hearReplayButtonCoords, fill = "red")
+    canvas.create_text(((data.hearReplayButtonCoords[0] + data.hearReplayButtonCoords[2])/2), 
+        data.height*3/4, text = "Replay", font = font)
+    canvas.create_rectangle(data.notePlayButtonCoords, fill = "red")
+    canvas.create_text(data.notePlayTextCoords,text = "Return to Compose Mode", font = "Arial 12 bold")
 
 def playNote(note):
     # define stream chunk   
@@ -672,6 +705,7 @@ def playMousePressed(event, data, play, compose):
         data.mode = "compose"
     if (compose.hearButtonCoords[0] < event.x < compose.hearButtonCoords[2] and
         compose.hearButtonCoords[1] < event.y < compose.hearButtonCoords[3]):
+        data.isPlayingTrack = 0
         data.mode = "hear"
     if (play.noteButtonCoords[0] < event.x < play.noteButtonCoords[2] and
         play.noteButtonCoords[1] < event.y < play.noteButtonCoords[3]):
@@ -911,7 +945,10 @@ def noteRedrawAll(canvas, data, compose, play):
 def drawNoteMessage(canvas, data, compose, play):
     x, y = data.width/4*3, data.height/4*3
     if data.isNoteText != None:
-        canvas.create_text(x,y, text = data.isNoteText, font = "Arial 35 bold")
+        if data.isNoteText[0]=="S":
+            canvas.create_text(x,y, text = data.isNoteText, font = "Arial 20 bold")
+        else:
+            canvas.create_text(x,y, text = data.isNoteText, font = "Arial 50 bold")
 
 def noteTimerFired():
     pass
@@ -995,7 +1032,7 @@ def run(width=300, height=300):
         redrawAllWrapper(canvas, data,compose,play)
 
     def keyPressedWrapper(event, canvas, data, compose,play):
-        keyPressed(event, data,compose,play)
+        keyPressed(event, data,compose,play, canvas)
         redrawAllWrapper(canvas, data,compose,play)
 
     def timerFiredWrapper(canvas, data, compose, play):
