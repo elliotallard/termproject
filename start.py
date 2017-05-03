@@ -77,6 +77,8 @@ def init(data, compose, play):
     data.isNoteText = None
     data.notePlayButtonCoords = (data.width/2 - 100, 20, data.width/2 + 100, 50)
     data.notePlayTextCoords = (data.width/2, 35)
+    data.helpButtonCoords = (data.width/2 - 100, data.height-35, data.width/2+100, data.height-5) 
+    data.helpButtonTextCoords = (data.width/2, data.height - 20)
     #COMPOSE
     compose.keySig = "C"
     compose.redoNotes = []
@@ -98,6 +100,7 @@ def init(data, compose, play):
     compose.YPlace = compose.topStaff
     compose.count = 0
     compose.timeSig = 1
+    compose.currStaff = 0
     #HEAR
     play.rightStaff, play.leftStaff = compose.rightStaff, compose.leftStaff
     play.topStaff = data.height // 5
@@ -130,34 +133,65 @@ def mousePressed(event, data, compose, play):
     elif (data.mode == "play"):   playMousePressed(event, data, play, compose)
     elif (data.mode == "hear"):       hearMousePressed(event, data)
     elif (data.mode == "note"): noteMousePressed(event, data, compose, play)
+    elif (data.mode == "help"): helpMousePressed(event, data)
 
 def keyPressed(event, data, compose, play):
     if (data.mode == "compose"): composeKeyPressed(event, data,compose)
     elif (data.mode == "play"):   playKeyPressed(event, data, play)
     elif (data.mode == "hear"):       hearKeyPressed(event, data, compose,play)
     elif (data.mode == "note"): noteKeyPressed(event, data, compose, play)
+    elif (data.mode == "help"): pass
 
 def timerFired(data, compose, play):
     if (data.mode == "compose"): composeTimerFired(data,compose)
     elif (data.mode == "play"):   playTimerFired(data, play, compose)
     elif (data.mode == "hear"):       hearTimerFired(data)
     elif (data.mode == "note"): noteTimerFired()
+    elif (data.mode == "help"): pass
 
 def redrawAll(canvas, data,compose, play):
     if (data.mode == "compose"): composeRedrawAll(canvas, data,compose,play)
     elif (data.mode == "play"):   playRedrawAll(canvas, data,compose, play)
     elif (data.mode == "hear"):       hearRedrawAll(canvas, data, compose, play)
     elif (data.mode == "note"): noteRedrawAll(canvas, data, compose, play)
+    elif (data.mode == "help"): helpRedrawAll(canvas, data)
 
 ####################################
 # compose mode
 ####################################
 
+NOTEPLACEMENTS = {"D0":0,
+                "C1":5,
+                "B1":10,
+                "A1":15,
+                "G1":20,
+                "F1":25,
+                "E1":30,
+                "D1":35,
+                "C2":40,
+                "B2":45,
+                "A2":50,
+                "G2":55,
+                "F2":60,
+                "E2":65,
+                "D2":70,
+                "C3":75,
+                "B3":80
+}
+
+#SOMEHOW CREATE A Y VALUE FROM JUST A NOTE AND A CURRSTAFF
+
 def addNote(n, compose, start, staff):
+    if isinstance(n, str):
+        if len(n) == 3: 
+            n = n[0]+n[2]
+        num = NOTEPLACEMENTS[n]
+        n = 60- 25 + num
+    else:
+        num = n - start
     lines = 0 #whether or not to draw lines above or below staff for reference
     note = ""
     # print (n)
-    num = n - start
     if num == 0: 
         note = "D0"
         if compose.keySig in ["B", "E"]: compose.keySigNotes.append("Eb1")
@@ -271,6 +305,9 @@ def composeMousePressed(event, data,compose):
         if step - 3 < event.y < step + 3:
             addNote(step, compose, start, compose.noteCurrStaff)
             return
+    if (data.helpButtonCoords[0] < event.x < data.helpButtonCoords[2] and
+        data.helpButtonCoords[1] < event.y < data.helpButtonCoords[3]):
+        data.mode = "help"
     timeSigMousePressed(event, data)
     keySigMousePressed(event,data)
 
@@ -309,7 +346,8 @@ def composeRedrawAll(canvas, data,compose, play):
     drawPlayButton(canvas, compose, data)
     drawHearButton(canvas, compose, data, play)
     drawTempoMsg(canvas, compose, data)
-    canvas.create_text(data.width/2, data.height - 20, text = "Press 'u' to undo note,'r'to redo")
+    canvas.create_rectangle(data.helpButtonCoords, fill = "white")
+    canvas.create_text(data.helpButtonTextCoords, text = "Help")
     timeSigRedrawAll(canvas, data)
     keySigRedrawAll(canvas, data)
     drawKeyTimeSigMessage(canvas,data)
@@ -637,8 +675,8 @@ def playMousePressed(event, data, play, compose):
         data.mode = "hear"
     if (play.noteButtonCoords[0] < event.x < play.noteButtonCoords[2] and
         play.noteButtonCoords[1] < event.y < play.noteButtonCoords[3]):
+        compose.notes = []
         compose.keySigNotes = []
-        compose.notes = [] 
         play.noteList = [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         data.isNoteText = None
         data.mode = "note"
@@ -802,8 +840,14 @@ def noteMousePressed(event, data, compose, play):
             play.noteList[key] =0
     if (data.notePlayButtonCoords[0]<event.x<data.notePlayButtonCoords[2] and 
         data.notePlayButtonCoords[1]<event.y<data.notePlayButtonCoords[3]):
+        compose.notes = []
+        compose.keySigNotes = []
         play.noteList = []
         data.mode = "play"
+    if data.isNoteText != "Sorry! This is not a note." and data.isNoteText != "":
+        if (play.replayButtonCoords[0]<event.x<play.replayButtonCoords[2] and 
+            play.replayButtonCoords[1]+50<event.y<play.replayButtonCoords[3]+50):
+            addNote(data.isNote, compose, 0, compose.currStaff)
 
 def clickedIn(x, y, data, compose, play):
     # octave key
@@ -847,6 +891,7 @@ def noteKeyPressed(event, data, compose, play):
     if event.keysym == "Return":
         for key in ALLNOTES.keys():
             if ALLNOTES[key] == play.noteList:
+                data.isNote = key
                 data.isNoteText = key[:-1]
                 return 
         data.isNoteText = "Sorry! This is not a note."
@@ -856,9 +901,12 @@ def noteRedrawAll(canvas, data, compose, play):
     drawFingerings(canvas,compose, data, play)
     drawNoteMessage(canvas, data, compose, play)
     drawNotePlayButton(canvas, play, data)
+    drawNotes(canvas, compose, data, play)
     directions = """Click in keys to represent pressed keys, 
     and press enter to see if it's a note!"""
     canvas.create_text(data.width*3/4,data.height/2 + 100,text = directions, font = "Helvetica 12 bold")
+    if data.isNoteText != "Sorry! This is not a note." and data.isNoteText != None:
+        drawAddNoteButton(canvas, play, data)
 
 def drawNoteMessage(canvas, data, compose, play):
     x, y = data.width/4*3, data.height/4*3
@@ -875,6 +923,57 @@ def drawNotePlayButton(canvas, play, data):
     text = "Return to Play Mode"
     canvas.create_rectangle(data.notePlayButtonCoords, fill = "red")
     canvas.create_text(data.notePlayTextCoords,text = text, font = "Arial 12 bold")
+
+def drawAddNoteButton(canvas, play, data):
+    words = "See This Note!"
+    canvas.create_rectangle(play.replayButtonCoords[0],play.replayButtonCoords[1]+50,
+        play.replayButtonCoords[2],play.replayButtonCoords[3]+50, fill = "green")
+    canvas.create_text(play.replayTextCoords[0], 
+        play.replayTextCoords[1]+50,text = words, font = "Helvetica 20 bold" )
+
+####################################
+# HELP MODE
+####################################
+
+def helpRedrawAll(canvas, data):
+    helpMe = """Welcome to SaxTutor! 
+    We hope you find this a very useful tool in learning to play the alto saxophone. 
+    Things to know about each mode:
+
+    Compose mode: First, choose a key signature and time signature by entering
+    each in their respective boxes, and pressing enter after you have typed
+    each in. After completing this, you can start 
+    placing notes on the staff by clicking on each space. You can change the tempo
+    of your piece here too if you would like. If you accidentally click on 
+    a note, you can press "u" to undo the note you just put down, and "r" 
+    in order to redo the note you just took away. 
+
+    Hear mode: If you have written something and would like to hear it out loud, 
+    click on this mode. If you press play, your composition will be played by an 
+    alto saxophone. If you are set, you can return to the compose mode. 
+
+    Play mode: This mode is for practicing your newly composed piece. Press play 
+    to visualize going through your piece with a key diagram of the saxophone.
+    You can increase tempo here to increase speed, or slow the tempo down 
+    to lock down tough jumps between notes. You can also pause in order to 
+    practice an individual note. 
+
+    Within play mode, you can see there is a NoteFinder mode.
+    
+    NoteFinder mode: This is a mode for the curious saxophonist. Many times
+    during the learning process, you may find yourself playing a note, but 
+    you are not sure what it is. So, click on this mode, click on the keys you
+    are pressing, and then press enter to see if what you are playing is a note.
+    If it is, you can then press "See this note" to see the note on a staff. 
+    """
+    text = "Help"
+    canvas.create_text(data.width/2, 50, text = text, font = "Arial 35 bold")
+    canvas.create_text(data.width/2, data.height/2, text = helpMe)
+    canvas.create_text(data.width/2, data.height - 20, text = "Click Anywhere to Return To Compose Mode",
+        font = "Arial 25 bold")
+
+def helpMousePressed(event, data):
+    data.mode = "compose"
 
 
 ####################################
